@@ -3,21 +3,20 @@ PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
 export PATH
 #=================================================================#
 #   System Required:  CentOS7, Ubuntu, Root Permission            #
-#   Description: panel node deploy script                         #
-#   Version: 1.1.1                                                #
+#   Description: just for ssrpanel node deploy script                         #
+#   Version: 1.1.3                                                #
 #   Author: 阿拉凹凸曼                                             #
 #   Intro:  https://sobaigu.com/                                  #
 #==================================================================
 
-libsodium_file="libsodium-1.0.17"
-libsodium_url="https://github.com/jedisct1/libsodium/releases/download/1.0.17/libsodium-1.0.17.tar.gz"
-# libsodium_url="https://github.com/jedisct1/libsodium"
-# libsodium_dir="/usr/libsodium"
 ssr_url="https://github.com/828768/shadowsocksr.git"
 ssr_path="/usr/shadowsocksr"
 bbr_url="https://raw.githubusercontent.com/chiakge/Linux-NetSpeed/master/tcp.sh"
 bbr_file="bbr_tcp_mod.sh"
-
+v2_installer="https://raw.githubusercontent.com/828768/Shell/master/v2ray-ssrpanel-plugin-install.sh"
+v2_config="https://raw.githubusercontent.com/828768/Shell/master/resource/v2ray-config.json"
+caddy_www="https://raw.githubusercontent.com/828768/Shell/master/resource/www.zip"
+caddy_config="https://raw.githubusercontent.com/828768/Shell/master/resource/Caddyfile"
 
 [ $(id -u) != "0" ] && { echo "错误: 请用root执行"; exit 1; }
 sys_bit=$(uname -m)
@@ -46,11 +45,16 @@ service_Cmd() {
 }
 
 $cmd --exclude=kernel* -y update
-$cmd install -y wget curl python unzip git gcc vim lrzsz screen ntp ntpdate cron net-tools telnet m2crypto python-devel python-setuptools openssl openssl-devel automake autoconf make libtool
+$cmd -y install wget curl unzip git gcc gcc-c++ vim lrzsz screen ntp ntpdate cron net-tools telnet m2crypto python python-devel python-setuptools openssl openssl-devel make automake autoconf libtool
+$cmd -y groupinstall "Development Tools"
 # 安装pip
-curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-python get-pip.py
-pip install --upgrade pip setuptools
+if command -v pip >/dev/null 2>&1; then
+	pip install --upgrade pip setuptools
+else
+	curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+	python get-pip.py
+	pip install --upgrade pip setuptools
+fi
 # 设置时区为CST
 echo yes | cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 ntpdate cn.pool.ntp.org
@@ -83,9 +87,8 @@ get_ip() {
 
 config_v2ray_caddy() {
 	read -p "伪装域名，如 sobaigu.com ：" fake_Domain
-		[ -z "$fake_Domain" ] && fake_Domain=":80 :443"
-	read -p "申请CA证书?(默认 N 用自签名，套CDN的就不用申请CA证书了) y/N ：" email
-		[ -z "$email" ] && email="self_signed"
+	read -p "申请CA证书?(默认 N 用自签名，套CDN的就不用申请CA证书了) y/N ：" tls_CA
+		[ -z "$tls_CA" ] && tls_CA="self_signed"
 	read -p "$(echo -e "$yellow转发路径$none(不要带/，默认：${cyan}game$none)")：" forward_Path
 		[ -z "$forward_Path" ] && forward_Path="game"
 	read -p "$(echo -e "$yellow V2Ray端口$none(不可80/443，默认：${cyan}10086$none)")：" v2ray_Port
@@ -96,13 +99,13 @@ config_v2ray_caddy() {
 		[ -z "$usersync_Port" ] && usersync_Port="10087"
 	read -p "面板分配的节点ID，如 6 ：" node_Id
 	read -p "数据库地址，如 1.1.1.1 ：" db_Host
-	read -p "$(echo -e "$yellow数据库端口$none(默认：${cyan}3306$none)")：" db_Port
+	read -p "$(echo -e "$yellow数据库名称$none(默认：${cyan}3306$none)")：" db_Port
 		[ -z "$db_Port" ] && db_Port="3306"
-	read -p "$(echo -e "$yellow数据库名称$none(默认：${cyan}name$none)")：" db_Name
-		[ -z "$db_Name" ] && db_Name="name"
-	read -p "$(echo -e "$yellow数据库用户$none(默认：${cyan}user$none)")：" db_User
-		[ -z "$db_User" ] && db_User="user"
-	read -p "数据库密码，如 password ：" db_Password
+	read -p "$(echo -e "$yellow数据库名称$none(默认：${cyan}ssrpanel$none)")：" db_Name
+		[ -z "$db_Name" ] && db_Name="ssrpanel"
+	read -p "$(echo -e "$yellow数据库用户$none(默认：${cyan}ssrpanel$none)")：" db_User
+		[ -z "$db_User" ] && db_User="ssrpanel"
+	read -p "数据库密码，如 ssrpanel ：" db_Password
 	install_caddy
 	install_v2ray
 	firewall_set
@@ -121,13 +124,13 @@ config_v2ray() {
 	read -p "$(echo -e "$yellow V2Ray额外ID$none(默认：${cyan}16$none)")：" alter_Id
 		[ -z "$alter_Id" ] && alter_Id="16"
 	read -p "数据库地址，如 1.1.1.1 ：" db_Host
-	read -p "$(echo -e "$yellow数据库端口$none(默认：${cyan}3306$none)")：" db_Port
+	read -p "$(echo -e "$yellow数据库名称$none(默认：${cyan}3306$none)")：" db_Port
 		[ -z "$db_Port" ] && db_Port="3306"
-	read -p "$(echo -e "$yellow数据库名称$none(默认：${cyan}name$none)")：" db_Name
-		[ -z "$db_Name" ] && db_Name="name"
-	read -p "$(echo -e "$yellow数据库用户$none(默认：${cyan}user$none)")：" db_User
-		[ -z "$db_User" ] && db_User="user"
-	read -p "数据库密码，如 password ：" db_Password
+	read -p "$(echo -e "$yellow数据库名称$none(默认：${cyan}ssrpanel$none)")：" db_Name
+		[ -z "$db_Name" ] && db_Name="ssrpanel"
+	read -p "$(echo -e "$yellow数据库用户$none(默认：${cyan}ssrpanel$none)")：" db_User
+		[ -z "$db_User" ] && db_User="ssrpanel"
+	read -p "数据库密码，如 ssrpanel ：" db_Password
 	install_v2ray
 	firewall_set
 	service_Cmd status v2ray
@@ -137,6 +140,8 @@ config_v2ray() {
 
 config_caddy() {
 	read -p "伪装域名，如 sobaigu.com ：" fake_Domain
+	read -p "申请CA证书?(默认 N 用自签名，套CDN的就不用申请CA证书了) y/N ：" tls_CA
+		[ -z "$tls_CA" ] && tls_CA="self_signed"
 	read -p "$(echo -e "$yellow转发路径$none(不要带/，默认：${cyan}game$none)")：" forward_Path
 		[ -z "$forward_Path" ] && forward_Path="game"
 	read -p "$(echo -e "$yellow转发到V2Ray端口$none(不可80/443，默认：${cyan}10086$none)")：" v2ray_Port
@@ -155,8 +160,8 @@ install_v2ray(){
 	echo "logs directory: /var/log/v2ray"
 	echo "configuration directory: /etc/v2ray"
 
-	curl -L -s https://raw.githubusercontent.com/828768/Shell/master/v2ray-ssrpanel-plugin-install.sh | bash
-	wget --no-check-certificate -O config.json https://raw.githubusercontent.com/828768/Shell/master/resource/v2ray-config.json
+	curl -L -s $v2_installer | bash
+	wget --no-check-certificate -O config.json $v2_config
 	sed -i -e "s/v2ray_Port/$v2ray_Port/g" config.json
 	sed -i -e "s/alter_Id/$alter_Id/g" config.json
 	sed -i -e "s/forward_Path/$forward_Path/g" config.json
@@ -227,18 +232,25 @@ install_caddy() {
 	echo -e "Caddy安装完成！"
 
 	# 放个本地游戏网站
-	wget --no-check-certificate -O www.zip https://raw.githubusercontent.com/828768/Shell/master/resource/www.zip
+	wget --no-check-certificate -O www.zip $caddy_www
 	unzip -n www.zip -d /srv/ && rm -f www.zip
 	# 修改配置
 	mkdir -p /etc/caddy/
-	wget --no-check-certificate -O Caddyfile https://raw.githubusercontent.com/828768/Shell/master/resource/Caddyfile
-	if [ $email == y ]; then
-		local email=$(((RANDOM << 22)))
-		sed -i -e "s/email/$email@gmail.com/g" Caddyfile
+	wget --no-check-certificate -O Caddyfile $caddy_config
+	if [[ $tls_CA == "y" || $tls_CA == "Y" ]]; then
+		local tls_CA=$(((RANDOM << 22)))
+		sed -i -e "s/tls_CA/$tls_CA@gmail.com/g" Caddyfile
 	else
-		sed -i -e "s/email/self_signed/g" Caddyfile
+		sed -i -e "s/tls_CA/self_signed/g" Caddyfile
 	fi
-	sed -i -e "s/fake_Domain/$fake_Domain/g" Caddyfile
+
+	# 如果不填伪装域名，那么直接监听80和443端口
+	if	[[ $fake_Domain ]]; then
+		sed -i -e "s/fake_Domain/http:\/\/$fake_Domain https:\/\/$fake_Domain/g" Caddyfile
+	else
+		sed -i -e "s/fake_Domain/:80 :443/g" Caddyfile
+		echo -e "[${yellow}Warning${plain}]未指定伪装域名，无法使用tls，请自行修改 /etc/caddy/Caddyfile"
+	fi
 	sed -i -e "s/forward_Path/$forward_Path/g" Caddyfile
 	sed -i -e "s/v2ray_Port/$v2ray_Port/g" Caddyfile
 	mv -f Caddyfile /etc/caddy/
@@ -336,12 +348,12 @@ install_ssr(){
 	read -p "数据库服务器地址:" db_Host
 	read -p "$(echo -e "$yellow数据库连接端口$none(默认：${cyan}3306$none)")：" db_Port
 		[ -z "$db_Port" ] && db_Port="3306"
-	read -p "$(echo -e "$yellow数据库名称$none(默认：${cyan}name$none)")：" db_Name
-		[ -z "$db_Name" ] && db_Name="name"
-	read -p "$(echo -e "$yellow数据库用户名$none(默认：${cyan}user$none)")：" db_User
-		[ -z "$db_User" ] && db_User="user"
-	read -p "$(echo -e "$yellow数据库密码$none(默认：${cyan}password$none)")：" db_Password
-		[ -z "$db_Password" ] && db_Password="password"
+	read -p "$(echo -e "$yellow数据库名称$none(默认：${cyan}ssrpanel$none)")：" db_Name
+		[ -z "$db_Name" ] && db_Name="ssrpanel"
+	read -p "$(echo -e "$yellow数据库用户名$none(默认：${cyan}ssrpanel$none)")：" db_User
+		[ -z "$db_User" ] && db_User="ssrpanel"
+	read -p "$(echo -e "$yellow数据库密码$none(默认：${cyan}ssrpanel$none)")：" db_Password
+		[ -z "$db_Password" ] && db_Password="ssrpanel"
 	read -p "本节点ID:" node_Id
 	read -p "$(echo -e "$yellow流量计算比例$none(默认：${cyan}1.5$none)")：" transfer_Ratio
 		[ -z "$transfer_Ratio" ] && transfer_Ratio="1.5"
@@ -438,11 +450,28 @@ install_ssr(){
 	sed -i -e "s/ss_Ban_Limit/$ss_Ban_Limit/g" user-config.json
 
 	#启动并设置开机自动运行
-	chmod +x run.sh && ./run.sh
-	ln -s "$ssr_path/run.sh" "/etc/init.d/ssrrun.sh"
+	if [ -f $ssr_path/server.py ]; then
+        chmod +x "$ssr_path/run.sh"
+		ln -sf "$ssr_path/run.sh" "/etc/init.d/ssrrun"
+        if $cmd="yum"; then
+            chkconfig --add ssrrun
+            chkconfig ssrrun on
+        elif $cmd="apt"; then
+            update-rc.d -f ssrrun defaults
+        fi
+    	/etc/init.d/ssrrun
+	else
+        echo "ShadowsocksR install failed, please check it"
+        install_cleanup
+        exit 1
+    fi
+	# chmod +x run.sh && ./run.sh
 	# sed -i "/shadowsocksr\/run.sh$/d"  /etc/rc.d/rc.local
 	# echo "/usr/shadowsocksr/run.sh" >> /etc/rc.d/rc.local
 	firewall_set
+}
+install_cleanup(){
+	rm -rf $ssr_path "/etc/init.d/ssrrun"
 }
 
 open_bbr(){
